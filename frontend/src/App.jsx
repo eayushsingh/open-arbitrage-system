@@ -11,15 +11,12 @@ import './dashboard.css';
 export default function App() {
   // Use production WebSocket URL when built for production, otherwise use local dev
   // Prefer an environment-provided WS URL (Vite: import.meta.env.VITE_WS_URL).
-  // Fall back to the Render-hosted URL for production, and localhost for dev.
+  // Use the Render-hosted WSS URL for connections.
   const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_URL)
     ? import.meta.env.VITE_WS_URL
     : null;
 
-  const defaultProd = 'wss://open-arbitrage-system.onrender.com/ws/opportunities';
-  const defaultDev = 'ws://127.0.0.1:8000/ws/opportunities';
-
-  const wsUrl = envUrl || (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD ? defaultProd : defaultDev);
+  const wsUrl = 'wss://open-arbitrage-system.onrender.com/ws/opportunities';
 
   const { data, status, lastMessageAt, reconnect } = useOpportunitiesSocket(wsUrl);
 
