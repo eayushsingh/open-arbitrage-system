@@ -5,9 +5,14 @@ via environment variables in production deployments.
 """
 import os
 
-# Database defaults (same as previous code)
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "ayush123")
-DB_NAME = os.getenv("DB_NAME", "arbitrage_system")
+# Frontend origins allowed for CORS. Set to your deployed frontend URL(s)
+# e.g. https://your-frontend.vercel.app or http://localhost:5173 for dev.
+# Comma-separated list supported via FRONTEND_ORIGINS env var.
+_origins = os.getenv("FRONTEND_ORIGINS", "*")
+# Allow wildcard '*' to represent any origin, otherwise split by commas
+if _origins.strip() == "*":
+	FRONTEND_ORIGINS = ["*"]
+else:
+	FRONTEND_ORIGINS = [o.strip() for o in _origins.split(",") if o.strip()]
+
+# Note: DB is now in-memory. Previous DB_* environment variables removed.

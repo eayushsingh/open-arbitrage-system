@@ -15,18 +15,19 @@ from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-import db
-import config
+from . import db
+from . import config
+from .ws_manager import manager as ws_manager
 
 logger = logging.getLogger("arbitrage.api")
 
 app = FastAPI(title="Arbitrage System API")
 
-# Allow browser-based clients from any origin in development. For
-# production, lock this down to the frontend origin(s).
+# Configure CORS using FRONTEND_ORIGINS from config. This allows locking
+# to the deployed frontend origin(s) while defaulting to '*' for dev.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,24 +36,13 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize DB connection pool on startup."""
-    logger.info("Starting up: initializing DB pool")
-    await db.init_pool(
-        host=config.DB_HOST,
-        port=config.DB_PORT,
-        user=config.DB_USER,
-        password=config.DB_PASSWORD,
-        database=config.DB_NAME,
-        minsize=1,
-        maxsize=10,
-    )
+    """No external DB to initialize; worker and in-memory store will be used."""
+    logger.info("Starting up: in-memory store active")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close DB pool on shutdown."""
-    logger.info("Shutting down: closing DB pool")
-    await db.close_pool()
+    logger.info("Shutdown event: nothing to close for in-memory store")
 
 
 @app.get("/opportunities")
@@ -73,8 +63,11 @@ async def websocket_opportunities(websocket: WebSocket):
     queries the DB pool asynchronously and sends a JSON payload containing
     the latest rows.
     """
-    # Accept the websocket connection and log client info if available
+    # Accept the websocket and register with the manager. The manager will
+    # handle broadcasting; this endpoint returns immediately and keeps the
+    # connection open until disconnect.
     await websocket.accept()
+    await ws_manager.connect(websocket)
     client = websocket.client
     if client:
         logger.info("WebSocket client connected: %s:%s", client.host, client.port)
@@ -82,33 +75,28 @@ async def websocket_opportunities(websocket: WebSocket):
         logger.info("WebSocket client connected: /ws/opportunities")
 
     try:
+        # Keep the connection open and await client pings/messages to detect
+        # disconnects. We don't expect incoming messages, but receiving them
+        # prevents the websocket from being GC'd or timing out in some
+        # environments.
         while True:
-            # Fetch latest opportunities from the async pool. db.fetch_opportunities
-            # returns a list of normalized dicts (possibly empty).
-            opportunities = await db.fetch_opportunities(limit=20)
-
-            # Ensure the payload is always a JSON array (even if empty)
-            payload = opportunities if isinstance(opportunities, list) else [opportunities]
-
-            # Send JSON payload. Wrap in try/except so transient serialization
-            # issues don't crash the websocket loop.
             try:
-                await websocket.send_json(payload)
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                raise
             except Exception:
-                logger.exception("Failed sending WS payload to client; continuing")
-
-            # Sleep in a non-blocking way so other requests are served.
-            await asyncio.sleep(2)
+                # Ignore non-disconnect exceptions; just yield to event loop.
+                await asyncio.sleep(0.1)
 
     except WebSocketDisconnect:
+        await ws_manager.disconnect(websocket)
         client = websocket.client
         if client:
             logger.info("WebSocket client disconnected: %s:%s", client.host, client.port)
         else:
             logger.info("WebSocket client disconnected: /ws/opportunities")
     except Exception as exc:  # pylint: disable=broad-except
-        # On unexpected errors, log and close the connection gracefully.
-        logger.exception("Error in WebSocket loop: %s", exc)
+        logger.exception("Error in WebSocket connection handler: %s", exc)
         try:
             await websocket.close(code=1011)
         except Exception:
