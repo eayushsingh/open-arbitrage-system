@@ -31,23 +31,14 @@ export default function useOpportunitiesSocket(url) {
     wsRef.current.onmessage = (evt) => {
       setLastMessageAt(new Date());
       try {
-        const parsed = JSON.parse(evt.data);
-        // Expecting array or single object
-        if (Array.isArray(parsed)) {
-          setData(parsed);
-        } else if (parsed && parsed.type === 'update' && parsed.payload) {
-          // merge single updates by id
-          setData(prev => {
-            const idx = prev.findIndex(i => i.id === parsed.payload.id);
-            if (idx === -1) return [parsed.payload, ...prev];
-            const copy = [...prev];
-            copy[idx] = { ...copy[idx], ...parsed.payload };
-            return copy;
-          });
-        } else {
-          // fallback: replace
-          setData(typeof parsed === 'object' ? parsed : []);
-        }
+        const incoming = JSON.parse(evt.data);
+
+        const normalized = Array.isArray(incoming) ? incoming : [incoming];
+
+        setData((prev) => {
+          const updated = [...normalized, ...prev];
+          return updated.slice(0, 20);
+        });
       } catch (err) {
         console.error('ws parse error', err);
       }
