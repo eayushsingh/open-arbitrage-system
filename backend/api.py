@@ -15,9 +15,9 @@ from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
-from . import config
-from .ws_manager import manager as ws_manager
+import db
+import config
+from ws_manager import manager as ws_manager
 
 logger = logging.getLogger("arbitrage.api")
 
