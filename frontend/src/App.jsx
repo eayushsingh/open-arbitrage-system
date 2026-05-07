@@ -9,8 +9,19 @@ import './dashboard.css';
 
 // Main Dashboard page
 export default function App() {
-  // Keep backend route unchanged
-  const { data, status, lastMessageAt, reconnect } = useOpportunitiesSocket('ws://127.0.0.1:8000/ws/opportunities');
+  // Use production WebSocket URL when built for production, otherwise use local dev
+  // Prefer an environment-provided WS URL (Vite: import.meta.env.VITE_WS_URL).
+  // Fall back to the Render-hosted URL for production, and localhost for dev.
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_URL)
+    ? import.meta.env.VITE_WS_URL
+    : null;
+
+  const defaultProd = 'wss://open-arbitrage-system.onrender.com/ws/opportunities';
+  const defaultDev = 'ws://127.0.0.1:8000/ws/opportunities';
+
+  const wsUrl = envUrl || (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD ? defaultProd : defaultDev);
+
+  const { data, status, lastMessageAt, reconnect } = useOpportunitiesSocket(wsUrl);
 
   const [filters, setFilters] = useState({
     profitableOnly: false,

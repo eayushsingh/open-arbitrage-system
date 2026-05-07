@@ -6,8 +6,8 @@ What's included
 - `api.py` - FastAPI application exposing:
   - `GET /opportunities` (REST) - returns latest 20 arbitrage opportunities (keeps previous API shape)
   - `WS /ws/opportunities` (WebSocket) - streams latest opportunities every 3 seconds
-- `db.py` - async aiomysql pool helper
-- `worker.py` - optional async worker to poll exchanges and store prices/arbitrage
+- `db.py` - in-memory storage for opportunities (no external DB required)
+- `worker.py` - async worker to poll exchanges and broadcast opportunities
 - `main.py` - legacy synchronous polling script (kept for backward compatibility)
 
 Setup
@@ -20,15 +20,13 @@ Setup
 python3 -m pip install -r requirements.txt
 ```
 
-3. Ensure your MySQL server is running and the credentials in `config.py` are correct.
-
 Run API (development):
 
 ```bash
 uvicorn api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Run worker (optional background process that writes to DB):
+Run worker (background poller that stores in-memory and broadcasts):
 
 ```bash
 python3 worker.py
@@ -36,8 +34,18 @@ python3 worker.py
 
 WebSocket usage (frontend):
 
-Connect to `ws://<host>:8000/ws/opportunities` and you'll receive a JSON array of latest opportunities every 3 seconds.
+In production the deployed backend is available at:
+
+```
+https://open-arbitrage-system.onrender.com
+```
+
+For WebSocket connections, use the `wss` URL in production:
+
+```
+wss://open-arbitrage-system.onrender.com/ws/opportunities
+```
 
 Notes
-- The repository now uses an async MySQL connection pool via `aiomysql`.
-- `main.py` was left unchanged to avoid breaking existing workflows. Prefer `worker.py` for async operation.
+- The backend now uses an in-memory store for opportunities and does not require an external database. This makes it suitable for deployment to platforms like Render without a managed database.
+- `main.py` is legacy and kept for reference. Use `worker.py` for the async polling/broadcasting loop.
