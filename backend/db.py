@@ -24,6 +24,7 @@ provides async functions so callers don't need to change.
 from typing import Any, Dict, List, Optional
 import asyncio
 import datetime
+import numpy
 
 # Internal storage and lock to make writes safe across async tasks
 _OPPORTUNITIES: List[Dict[str, Any]] = []
